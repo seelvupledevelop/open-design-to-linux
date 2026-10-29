@@ -114,6 +114,7 @@ jobs:
 
       - name: Publish release
         if: steps.gate.outputs.should_build == 'true'
+        working-directory: packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.gate.outputs.version }}
