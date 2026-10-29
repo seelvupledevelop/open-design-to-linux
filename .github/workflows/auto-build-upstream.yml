@@ -139,4 +139,4 @@ jobs:
             --title "Open Design $VERSION (Linux) — deb + AppImage" \
             --notes "$NOTES" \
             --latest \
-            open-design_*_amd64.deb Open-Design-*_x86_64.AppImage "checksums-$VERSION.txt"
+            open-design_*_amd64.deb Open-Design-*-x86_64.AppImage "checksums-$VERSION.txt"
