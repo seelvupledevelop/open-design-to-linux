@@ -5,10 +5,12 @@
   "description": "Tooling that repackages the official Open Design macOS DMG into Linux deb + AppImage packages",
   "scripts": {
     "port": "bash scripts/port-app-dir.sh",
+    "natives": "bash scripts/install-native-modules.sh",
     "smoke": "bash scripts/smoke-test.sh",
     "package": "electron-builder --x64"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.1",
     "electron-builder": "^26.0.12"
   }
 }

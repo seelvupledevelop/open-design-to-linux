@@ -37,6 +37,9 @@ user data (`~/.config/Open Design`) is shared by default.
 
 ## Caveats (vs upstream mac/win builds)
 
+- Agent-runtime helper binaries bundled upstream as Mach-O (`open-design/bin/opencode`,
+  `vela`) have no Linux equivalents inside the DMG and are dropped from the Linux packages;
+  agent runtime features that depend on them need a separately installed Linux runtime.
 - Upstream's auto-updater feed is a placeholder (`updates.invalid`); the Linux builds do
   **not** self-update. Watch this repo's releases — the scheduled workflow builds new
   versions automatically, reinstall the new .deb to update.

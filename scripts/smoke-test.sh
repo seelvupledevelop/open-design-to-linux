@@ -25,7 +25,7 @@ try {
 } catch (e) { console.error("SMOKE FAIL:", e.message); process.exit(1); }
 '
 
-if ELECTRON_RUN_AS_NODE=1 "$ELECTRON" --no-sandbox -e "$CHECK"; then
+if ELECTRON_RUN_AS_NODE=1 "$ELECTRON" -e "$CHECK"; then
   exit 0
 fi
 
@@ -36,7 +36,7 @@ export npm_config_disturl=https://electronjs.org/headers
 export npm_config_build_from_source=true
 npm rebuild better-sqlite3 node-pty
 
-if ELECTRON_RUN_AS_NODE=1 "$ELECTRON" --no-sandbox -e "$CHECK"; then
+if ELECTRON_RUN_AS_NODE=1 "$ELECTRON" -e "$CHECK"; then
   echo "== Rebuild fixed it, continuing =="
   exit 0
 fi

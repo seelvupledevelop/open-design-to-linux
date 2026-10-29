@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
-# Port the official Open Design macOS DMG into a Linux-ready Electron app directory.
+# Port the official Open Design macOS DMG into a Linux-ready layout:
+#   app/            the Electron app dir (staged as the electron-builder app)
+#   resources-extra/ Resources files referenced via process.resourcesPath
+#                   (open-design assets, web-standalone server, dom-to-pptx)
 #
 # Usage: bash scripts/port-app-dir.sh <upstream-version>
-#   e.g. bash scripts/port-app-dir.sh 0.26.1
 #
-# What it does:
-#   1. Downloads the official mac-x64 DMG + .sha256 from nexu-io/open-design releases
-#      and verifies the checksum.
-#   2. Extracts "Open Design.app/Contents/Resources/app" (upstream ships an unpacked
-#      Electron app dir: package.json + main.cjs + prebundled + node_modules).
-#   3. Prunes macOS-only native binaries and reinstalls the native modules for
-#      linux-x64 against the bundled Electron ABI (better-sqlite3, node-pty, sharp,
-#      @ffmpeg-installer/ffmpeg). onnxruntime-node already ships linux bindings.
-#   4. Detects the bundled Electron version (e.g. Electron/41.3.0) and writes it to
-#      work/electron-version.txt so the workflow can pin the runtime.
-#   5. Patches the staged package.json (name/author) for clean deb metadata.
+# Why not a plain 7zz extract?
+#   - The DMG contains pnpm-style symlinks (web-standalone/node_modules/@scope/...
+#     -> ../.pnpm/...) which 7zz refuses as "dangerous link path" and reports on
+#     stderr while still extracting the real files. We capture the report and
+#     recreate those links afterwards, then validate everything needed.
+#   - The macOS bundle carries Mach-O binaries (open-design/bin/opencode, vela)
+#     plus helper frameworks; native Linux equivalents are not part of the DMG,
+#     so Mach-O files are dropped from the ported Resources.
 set -euo pipefail
 
 VERSION="${1:?usage: port-app-dir.sh <version>}"
 UPSTREAM_REPO="${UPSTREAM_REPO:-nexu-io/open-design}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$ROOT/work"
-APP_SRC=""
 APP_DIR="$ROOT/app"
+EXTRA="$ROOT/resources-extra"
 
 echo "== Open Design $VERSION: fetching official DMG =="
 mkdir -p "$WORK"
@@ -30,31 +29,51 @@ DMG_URL="https://github.com/${UPSTREAM_REPO}/releases/download/open-design-v${VE
 F="$WORK/open-design-${VERSION}-mac-x64.dmg"
 [ -s "$F" ] || curl -fL "$DMG_URL" -o "$F"
 curl -fL "${DMG_URL}.sha256" -o "$WORK/dmg.sha256"
-# The official .sha256 asset contains "<digest> <filename>"; take the digest only.
 EXPECTED=$(awk 'NR==1{print $1}' "$WORK/dmg.sha256")
 ACTUAL=$(sha256sum "$F" | awk '{print $1}')
 [ "$EXPECTED" = "$ACTUAL" ] || { echo "DMG sha256 mismatch: $ACTUAL != $EXPECTED"; exit 1; }
 echo "Checksum OK: $ACTUAL"
 
-echo "== Extracting DMG (7zz) =="
+echo "== Extracting DMG (7zz, tolerating skipped dangerous links) =="
 rm -rf "$WORK/extract" && mkdir -p "$WORK/extract"
-7z x -y "$F" -o"$WORK/extract" >/dev/null
-APP_SRC=$(find "$WORK/extract" -maxdepth 2 -name "Open Design.app" | head -1)
-[ -n "$APP_SRC" ] || { echo "Open Design.app not found in DMG"; exit 1; }
+set +e
+7z x -y "$F" -o"$WORK/extract" >"$WORK/extraction.log" 2>&1
+R7Z=$?
+set -e
+grep -a "Dangerous link path was ignored" "$WORK/extraction.log" | while IFS= read -r line; do
+  rest="${line#*Dangerous link path was ignored : }"
+  path="${rest%% : *}"
+  target="${rest#* : }"
+  mkdir -p "$(dirname "$WORK/extract/$path")"
+  ln -sfn "$target" "$WORK/extract/$path"
+  echo "relaunched symlink: $path -> $target"
+done
+
+APP_SRC=$(find "$WORK/extract" -maxdepth 3 -name "Open Design.app" -type d | head -1)
+[ -n "$APP_SRC" ] || { echo "Open Design.app not found in DMG"; tail -5 "$WORK/extraction.log"; exit 1; }
+RSRC="$APP_SRC/Contents/Resources"
 
 echo "== Detecting bundled Electron version =="
 ELECTRON_FRAMEWORK="$APP_SRC/Contents/Frameworks/Electron Framework.framework/Electron Framework"
-EV=$(grep -aom1 'Electron/[0-9][0-9.]*' "$ELECTRON_FRAMEWORK" | cut -d/ -f2)
+EV=$(grep -aoE 'Electron/[0-9]+\.[0-9]+\.[0-9]+' "$ELECTRON_FRAMEWORK" | head -n1 | cut -d/ -f2)
 [ -n "$EV" ] || EV="41.3.0"
 echo "$EV" > "$WORK/electron-version.txt"
 echo "Bundled Electron: $EV"
 
 echo "== Staging app dir =="
-rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR"
-cp -a "$APP_SRC/Contents/Resources/app/." "$APP_DIR/"
+rm -rf "$APP_DIR" "$EXTRA"
+mkdir -p "$APP_DIR" "$EXTRA"
+cp -a "$RSRC/app/." "$APP_DIR/"
 
-echo "== Pruning macOS-only native components =="
+echo "== Staging Resources referenced by process.resourcesPath =="
+for item in open-design open-design-config.json open-design-web-standalone dom-to-pptx.bundle.js.gz; do
+  cp -a "$RSRC/$item" "$EXTRA/$item"
+done
+
+echo "== Stripping Mach-O darwin binaries from ported resources =="
+find "$EXTRA" -type f -exec sh -c 'LC_ALL=C file -b "$1" | grep -q "Mach-O" && rm -f "$1" && echo "dropped Mach-O: $1"' _ {} \;
+
+echo "== Pruning macOS-only native components from app/node_modules =="
 cd "$APP_DIR"
 rm -rf node_modules/fsevents
 rm -rf node_modules/@img/sharp-darwin-x64 node_modules/@img/sharp-libvips-darwin-x64
@@ -68,23 +87,21 @@ node - <<EOF
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 pkg.name = 'open-design';
-pkg.author = 'Open Design (Apache-2.0) — Linux port by seelvupledevelop';
+pkg.author = { name: 'Open Design Linux port (seelvupledevelop)', email: 'seelvupledevelop@users.noreply.github.com' };
 pkg.description = pkg.description || 'Open Design — Linux build from the official macOS package';
 if (pkg.optionalDependencies) delete pkg.optionalDependencies.fsevents;
 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
 EOF
 
-echo "== Installing native modules for linux-x64 / Electron $EV =="
-BS3=$(node -e "console.log(require('./package.json').dependencies['better-sqlite3'])")
-PTV=$(node -e "console.log(require('./package.json').dependencies['node-pty'])")
-FAK=$(node -e "console.log(require('./package.json').dependencies['@ffmpeg-installer/ffmpeg'])")
-SHV=$(node -e "console.log(require('./package.json').dependencies['sharp'])")
-export npm_config_runtime=electron
-export npm_config_target="$EV"
-export npm_config_disturl=https://electronjs.org/headers
-npm install --no-save --no-audit --no-fund \
-  "better-sqlite3@$BS3" "node-pty@$PTV" "sharp@$SHV" "@ffmpeg-installer/ffmpeg@$FAK"
+echo "== (native modules are installed separately by scripts/install-native-modules.sh) =="
+
+echo "== Validating ported layout =="
+[ -f "$APP_DIR/package.json" ] && [ -f "$APP_DIR/main.cjs" ] && [ -f "$APP_DIR/prebundled/packaged-main.mjs" ]
+[ -d "$APP_DIR/node_modules" ] && [ -f "$EXTRA/open-design-config.json" ]
+[ -d "$EXTRA/open-design-web-standalone/node_modules/.pnpm" ]
+L=$EXTRA/open-design-web-standalone/node_modules/@opentelemetry/api
+[ -d "$(readlink -f "$L")" ] || { echo "web-standalone symlink broken: $L"; exit 1; }
+echo "Layout OK"
 
 echo "== Port complete =="
-echo "App dir: $APP_DIR"
 echo "Electron: $EV (work/electron-version.txt)"

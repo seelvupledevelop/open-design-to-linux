@@ -1,0 +1,18 @@
+{
+  "amrProfile": "prod",
+  "appVersion": "0.26.1",
+  "daemonCliEntryRelative": "app/prebundled/daemon/daemon-cli.mjs",
+  "daemonSidecarEntryRelative": "app/prebundled/daemon/daemon-sidecar.mjs",
+  "namespace": "release-stable-intel",
+  "telemetryRelayUrl": "https://telemetry.open-design.ai/api/langfuse",
+  "posthogKey": "phc_u5dHWkwdqN626opkbbjDKk7xNzxR2UsJbdQqx3DncbjU",
+  "posthogHost": "https://us.i.posthog.com",
+  "velaWebUrl": "https://open-design.ai/cloud",
+  "velaWebUrls": {
+    "prod": "https://open-design.ai/cloud",
+    "test": "https://open-design.powerformer.net/cloud",
+    "feature-test": "https://amr-feature.powerformer.net"
+  },
+  "webSidecarEntryRelative": "app/prebundled/web-sidecar.mjs",
+  "webOutputMode": "standalone"
+}

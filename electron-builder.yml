@@ -10,6 +10,15 @@ directories:
   app: app
   output: packages
 
+# Files the main process resolves via process.resourcesPath (open-design assets,
+# web-standalone server, dom-to-pptx) are staged by scripts/port-app-dir.sh and
+# placed into the Linux Resources root, same relative layout as upstream macOS.
+extraResources:
+  - from: resources-extra
+    to: .
+    filter:
+      - "**/*"
+
 files:
   - "**/*"
 
@@ -22,10 +31,6 @@ linux:
       arch: x64
     - target: AppImage
       arch: x64
-  desktop:
-    Name: Open Design
-    Comment: Open-source design workspace that pairs with coding agents
-    StartupWMClass: io.open-design.desktop
 
 deb:
   artifactName: open-design_${version}_amd64.${ext}

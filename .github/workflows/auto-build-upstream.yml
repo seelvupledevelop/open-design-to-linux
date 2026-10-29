@@ -92,6 +92,10 @@ jobs:
           echo "Electron runtime: $EV"
           npm install --no-save --no-audit --no-fund "electron@$EV"
 
+      - name: Install native modules for the bundled Electron ABI
+        if: steps.gate.outputs.should_build == 'true'
+        run: bash scripts/install-native-modules.sh
+
       - name: Smoke test native modules
         if: steps.gate.outputs.should_build == 'true'
         run: bash scripts/smoke-test.sh
