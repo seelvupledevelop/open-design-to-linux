@@ -30,8 +30,8 @@ DMG_URL="https://github.com/${UPSTREAM_REPO}/releases/download/open-design-v${VE
 F="$WORK/open-design-${VERSION}-mac-x64.dmg"
 [ -s "$F" ] || curl -fL "$DMG_URL" -o "$F"
 curl -fL "${DMG_URL}.sha256" -o "$WORK/dmg.sha256"
-# The official .sha256 asset contains only the hex digest; verify against it.
-EXPECTED=$(tr -d ' \n' < "$WORK/dmg.sha256")
+# The official .sha256 asset contains "<digest> <filename>"; take the digest only.
+EXPECTED=$(awk 'NR==1{print $1}' "$WORK/dmg.sha256")
 ACTUAL=$(sha256sum "$F" | awk '{print $1}')
 [ "$EXPECTED" = "$ACTUAL" ] || { echo "DMG sha256 mismatch: $ACTUAL != $EXPECTED"; exit 1; }
 echo "Checksum OK: $ACTUAL"
