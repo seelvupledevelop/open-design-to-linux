@@ -1,0 +1,14 @@
+{
+  "name": "open-design-to-linux-builder",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tooling that repackages the official Open Design macOS DMG into Linux deb + AppImage packages",
+  "scripts": {
+    "port": "bash scripts/port-app-dir.sh",
+    "smoke": "bash scripts/smoke-test.sh",
+    "package": "electron-builder --x64"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.0.12"
+  }
+}

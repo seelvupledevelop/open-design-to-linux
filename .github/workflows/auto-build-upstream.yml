@@ -1,0 +1,136 @@
+name: Auto-build upstream release
+
+# Daily check: when Open Design (nexu-io/open-design) publishes a new release
+# containing a mac-x64 DMG, build Linux deb + AppImage packages from it and
+# publish them here. This repo is public; Apache-2.0 upstream, so re-packaged
+# binaries may be redistributed with attribution (see packaging/).
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    # Manual trigger from the Actions tab.
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-build-upstream
+  cancel-in-progress: false
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      UPSTREAM_REPO: nexu-io/open-design
+    steps:
+      - name: Check upstream version and gate on existing release
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh api "repos/$UPSTREAM_REPO/releases/latest" --jq '.tag_name')
+          VERSION="${TAG#open-design-v}"
+          if [ "$VERSION" = "$TAG" ]; then
+            echo "Unexpected upstream tag format: $TAG" >&2
+            exit 1
+          fi
+          ASSET="open-design-${VERSION}-mac-x64.dmg"
+          DMG_URL="https://github.com/$UPSTREAM_REPO/releases/download/open-design-v${VERSION}/$ASSET"
+          if ! curl -sfIL "$DMG_URL" >/dev/null; then
+            echo "Upstream release $TAG has no x64 DMG asset — skipping." >&2
+            exit 1
+          fi
+          echo "Upstream latest: $VERSION ($DMG_URL)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "linux-v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release linux-v$VERSION already exists here. Skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version $VERSION — will build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.should_build == 'true'
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        if: steps.gate.outputs.should_build == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install system dependencies
+        if: steps.gate.outputs.should_build == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev xz-utils python3 make g++ libfuse2
+          # Official 7-Zip binary (>=21 required for Apple DMGs); p7zip 16.02
+          # can fail on some compressed DMGs. Use the ip7z GitHub mirror.
+          curl -sfL "https://github.com/ip7z/7zip/releases/download/26.01/7z2601-linux-x64.tar.xz" -o /tmp/7z.tar.xz
+          mkdir -p /tmp/7zip && tar xf /tmp/7z.tar.xz -C /tmp/7zip
+          sudo install -m755 /tmp/7zip/7zz /usr/local/bin/7zz
+          sudo ln -sf /usr/local/bin/7zz /usr/local/bin/7z
+          7z 2>&1 | head -2
+
+      - name: Install builder dependencies
+        if: steps.gate.outputs.should_build == 'true'
+        run: npm ci
+
+      - name: Port DMG app to Linux
+        if: steps.gate.outputs.should_build == 'true'
+        run: bash scripts/port-app-dir.sh "${{ steps.gate.outputs.version }}"
+
+      - name: Install Electron runtime
+        if: steps.gate.outputs.should_build == 'true'
+        run: |
+          EV=$(cat work/electron-version.txt)
+          echo "Electron runtime: $EV"
+          npm install --no-save --no-audit --no-fund "electron@$EV"
+
+      - name: Smoke test native modules
+        if: steps.gate.outputs.should_build == 'true'
+        run: bash scripts/smoke-test.sh
+
+      - name: Build deb + AppImage
+        if: steps.gate.outputs.should_build == 'true'
+        run: npx electron-builder --x64
+
+      - name: Generate checksums
+        if: steps.gate.outputs.should_build == 'true'
+        working-directory: packages
+        run: |
+          sha256sum open-design_*_amd64.deb Open-Design-*-x86_64.AppImage > "checksums-${{ steps.gate.outputs.version }}.txt"
+          cat "checksums-${{ steps.gate.outputs.version }}.txt"
+
+      - name: Publish release
+        if: steps.gate.outputs.should_build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: |
+          TAG="linux-v$VERSION"
+          NOTES="Auto-built from the official Open Design $VERSION macOS DMG (Apache-2.0, [upstream release](https://github.com/nexu-io/open-design/releases/tag/open-design-v$VERSION)). Re-packaged for Linux with the bundled Electron runtime and linux-x64 native modules (better-sqlite3, node-pty, sharp, ffmpeg).
+
+          **Install (Debian/Ubuntu/Mint):**
+          \`\`\`bash
+          sudo apt install ./open-design_${VERSION}_amd64.deb
+          \`\`\`
+
+          **AppImage:**
+          \`\`\`bash
+          chmod +x Open-Design-${VERSION}-x86_64.AppImage && ./Open-Design-${VERSION}-x86_64.AppImage
+          \`\`\`
+
+          Built automatically on schedule by this repo's GitHub Actions. Upstream Open Design is (c) the Open Design contributors, licensed Apache-2.0 (see packaging/LICENSE-OPEN-DESIGN.txt). Not affiliated with upstream; report Linux-port issues here, upstream issues upstream."
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Open Design $VERSION (Linux) — deb + AppImage" \
+            --notes "$NOTES" \
+            --latest \
+            open-design_*_amd64.deb Open-Design-*_x86_64.AppImage "checksums-$VERSION.txt"
