@@ -18,9 +18,24 @@ This is the same scheme as the Factory Desktop Linux artifacts pipeline:
 6. `electron-builder` produces the `.deb` and `.AppImage`, checksums are generated, and a
    release like `linux-v0.26.1` is published here.
 
+The Actions pipeline lives in this repo's folder
+[.github/workflows/auto-build-upstream.yml](.github/workflows/auto-build-upstream.yml) —
+that is where every new `.deb` is created. **Releases other than the tested one listed
+below are built by GitHub Actions and are NOT tested** — treat them as build-verified
+(checksums + ABI smoke test pass) but manually untested.
+
+## Tested releases (Linux Mint)
+
+| Release | Status |
+|---|---|
+| **linux-v0.26.1** | ✅ Installed and launched on Linux Mint (Ubuntu 24.04 base): deb installs cleanly, menu entry works, app boots, sidecar supervisor runs (Electron-ABI native modules verified) |
+| any other release | ⚠️ Auto-built by GitHub Actions — **not tested**, see above |
+
+Keep this table current: whenever a new release has been tested on Linux Mint, list it here.
+
 ## Install
 
-**Debian / Ubuntu / Mint**
+**Debian / Ubuntu / Linux Mint**
 ```bash
 sudo apt install ./open-design_<version>_amd64.deb
 ```
@@ -34,6 +49,19 @@ chmod +x Open-Design-<version>-x86_64.AppImage
 Same version, two artifacts: the .deb integrates with your system (app menu, `/opt`),
 the AppImage is portable. Do not run both side by side expecting shared state — Electron
 user data (`~/.config/Open Design`) is shared by default.
+
+### Where it is installed (deb)
+
+| What | Where |
+|---|---|
+| App binary | `/opt/Open Design/open-design` |
+| Application files (resources, web-standalone server, open-design assets) | `/opt/Open Design/` |
+| Menu entry / .desktop file | `/usr/share/applications/open-design.desktop` |
+| App data (settings, projects, databases) | `~/.config/Open Design` |
+| Package name (for `apt remove`/`apt purge`) | `open-design` |
+
+The AppImage installs nothing; it runs from wherever you place the file and uses the same
+`~/.config/Open Design` data directory.
 
 ## Caveats (vs upstream mac/win builds)
 
@@ -54,7 +82,7 @@ user data (`~/.config/Open Design`) is shared by default.
 ```bash
 npm ci
 npm run port -- 0.26.1        # download + port the DMG app dir
-npm install --no-save electron@$(cat work/electron-version.txt)
+npm run natives               # GNU/Linux native modules against the bundled Electron ABI
 npm run smoke
 npm run package               # -> packages/*.deb, packages/*.AppImage
 ```
