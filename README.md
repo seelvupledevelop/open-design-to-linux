@@ -31,7 +31,7 @@ below are built by GitHub Actions and are NOT tested** — treat them as build-v
 
 | Release | Status |
 |---|---|
-| **linux-v0.26.1** | ✅ Installed and launched on Linux Mint (Ubuntu 24.04 base): deb installs cleanly, menu entry works, app boots, sidecar supervisor runs (Electron-ABI native modules verified) |
+| **linux-v0.26.1** | ✅ Installed and launched on Linux Mint (Ubuntu 24.04 base): deb installs cleanly, menu entry works, app boots, sidecar supervisor runs (Electron-ABI native modules verified); Linux agent-runtime helpers bundled and verified at the daemon's resolution paths — `vela --version` = 0.1.7, exactly upstream's pack-tool pin |
 | any other release | ⚠️ Auto-built by GitHub Actions — **not tested**, see above |
 
 Keep this table current: whenever a new release has been tested on Linux Mint, list it here.
