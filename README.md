@@ -68,6 +68,13 @@ The AppImage installs nothing; it runs from wherever you place the file and uses
 
 ## Caveats (vs upstream mac/win builds)
 
+- Agent CLIs installed via **snap** can break the tools panel's detection: the daemon
+  probes each CLI with a 3-second timeout, and snap-shim cold starts can exceed it
+  (reported as "found but is not executable") and its Install button links the vendor
+  homepage, which defaults to the macOS download. Fix pattern: symlink the snap's real
+  ELF into a dirs Open Design searches first, e.g.
+  `ln -sfn /snap/antigravity-cli/current/bin/agy ~/.local/bin/agy` (survives snap
+  refreshes), then rescan in the app.
 - Sign-in hands off back to the app from the browser via `xdg-open opendesign://…`.
   The deb's desktop entry registers that scheme handler (`MimeType`), so it works out
   of the box on a fresh install. The AppImage registers nothing itself — run once:
