@@ -13,7 +13,10 @@ This is the same scheme as the Factory Desktop Linux artifacts pipeline:
    `node_modules`) is migrated from the mac bundle.
 4. macOS-only native binaries are pruned and the native modules are reinstalled for
    **linux-x64 against the bundled Electron ABI** (better-sqlite3, node-pty, sharp,
-   @ffmpeg-installer/ffmpeg; onnxruntime-node already ships linux bindings).
+   @ffmpeg-installer/ffmpeg; onnxruntime-node already ships linux bindings). The
+   agent-runtime helpers (`vela` + its `libexec/opencode/opencode` companion) are bundled
+   as official **linux-x64 npm builds**, version-pinned to upstream's own pack tool
+   (`tools/pack/package.json` at the release tag) and checksum-verified.
 5. An ABI smoke test loads every native module under the pinned Electron before packaging.
 6. `electron-builder` produces the `.deb` and `.AppImage`, checksums are generated, and a
    release like `linux-v0.26.1` is published here.
@@ -65,9 +68,10 @@ The AppImage installs nothing; it runs from wherever you place the file and uses
 
 ## Caveats (vs upstream mac/win builds)
 
-- Agent-runtime helper binaries bundled upstream as Mach-O (`open-design/bin/opencode`,
-  `vela`) have no Linux equivalents inside the DMG and are dropped from the Linux packages;
-  agent runtime features that depend on them need a separately installed Linux runtime.
+- Agent-runtime helpers are bundled Linux builds from npm (`@powerformer/vela-cli-linux-x64`
+  at the version upstream's pack tool pins). Version drift between the app and the helper
+  APIs is possible if upstream changes its pin expecting newer helper capability; report
+  agent-runtime errors here with the daemon log.
 - Upstream's auto-updater feed is a placeholder (`updates.invalid`); the Linux builds do
   **not** self-update. Watch this repo's releases — the scheduled workflow builds new
   versions automatically, reinstall the new .deb to update.
@@ -85,6 +89,11 @@ npm run port -- 0.26.1        # download + port the DMG app dir
 npm run natives               # GNU/Linux native modules against the bundled Electron ABI
 npm run smoke
 npm run package               # -> packages/*.deb, packages/*.AppImage
+```
+
+Plus, separately (also run by the workflow right after the port):
+```bash
+npm run helpers -- 0.26.1    # vela + opencode linux helpers from npm, upstream-pinned
 ```
 
 ## Provenance & license

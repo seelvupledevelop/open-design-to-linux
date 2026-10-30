@@ -85,6 +85,10 @@ jobs:
         if: steps.gate.outputs.should_build == 'true'
         run: bash scripts/port-app-dir.sh "${{ steps.gate.outputs.version }}"
 
+      - name: Install Linux agent-runtime helpers (vela + opencode companion)
+        if: steps.gate.outputs.should_build == 'true'
+        run: bash scripts/install-agent-helpers.sh "${{ steps.gate.outputs.version }}"
+
       - name: Install Electron runtime
         if: steps.gate.outputs.should_build == 'true'
         run: |

@@ -1,5 +1,8 @@
 node_modules/
 app/
 packages/
+# Agent-runtime Linux helper binaries are ~200 MB combined (opencode is >100 MB,
+# past GitHub's git file limit); the workflow installs them from npm at build time.
+resources-extra/open-design/bin/
 work/
 *.log
