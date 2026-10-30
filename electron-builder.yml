@@ -26,6 +26,11 @@ linux:
   category: Graphics
   icon: packaging/icon.png
   artifactName: Open-Design-${version}-${arch}.${ext}
+  # Sign-in/invite deep links come back from the browser as opendesign:// URLs.
+  # electron-builder silently drops MimeType from desktop entry snippets — set
+  # it via this top-level option so the deb ships a working scheme handler.
+  mimeTypes:
+    - x-scheme-handler/opendesign
   target:
     - target: deb
       arch: x64
