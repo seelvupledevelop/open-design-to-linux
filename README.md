@@ -66,6 +66,42 @@ user data (`~/.config/Open Design`) is shared by default.
 The AppImage installs nothing; it runs from wherever you place the file and uses the same
 `~/.config/Open Design` data directory.
 
+## Use Freebuff as the model engine (BYOK)
+
+Open Design ships a **BYOK OpenCode** agent runtime that accepts any
+OpenAI-compatible endpoint — including [Freebuff](https://freebuff.com). With
+bridge connected, Open Design's "What would you like to create?" sessions run
+on your own Freebuff credits and models (e.g. the Sol family, `gpt-6.1-sol`),
+instead of the built-in AMR runtime.
+
+1. Create a personal API key: **freebuff.com → Account → Developer API**
+   (Desktop build: Account → Developer API).
+2. Seed the key into the daemon's agent env (hidden prompt, one command):
+   ```bash
+   bash scripts/freebuff-byok-setup.sh
+   ```
+3. In Open Design's model picker choose **BYOK OpenCode** and enter:
+   - protocol: **openai**
+   - base URL: **https://freebuff.com/api/v1/paid**
+   - model: a **tool-capable** Freebuff model id, e.g. `gpt-6.1-sol`
+   - key env: `OPENAI_API_KEY`
+
+Tool capability matters: agentic sessions only work with models whose
+`toolCalls: true`. At the time of writing the Freebuff model list marks these
+as tool-capable: `deepseek-v4.1-flash` (the only streaming + tool model),
+`gpt-6.1-sol`, `gpt-6-luna`, `gemini-3.8-flash`, `gemini-4-argon`,
+`claude-haiku-5-5`, `qwen3.8-max`, `minimax-m3`, `claude-fable-5-1`.
+Everything else answers plain chat fine but cannot drive an agentic session.
+
+`scripts/freebuff-byok-setup.sh --clear` removes the stored key again. The
+helper only touches the machine-local daemon config (`agentCliEnv` in
+`~/.config/Open Design/.../data/app-config.json`); the key never lands in this
+repository.
+
+Freebuff as an MCP server for Open Design (`od mcp live-artifacts`) and the
+reverse direction — publishing Open Design exports (HTML) on Freebuff Sites —
+are separate, follow-up integrations.
+
 ## Caveats (vs upstream mac/win builds)
 
 - Agent CLIs installed via **snap** can break the tools panel's detection: the daemon
