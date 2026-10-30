@@ -102,6 +102,38 @@ Freebuff as an MCP server for Open Design (`od mcp live-artifacts`) and the
 reverse direction — publishing Open Design exports (HTML) on Freebuff Sites —
 are separate, follow-up integrations.
 
+## Read/write Open Design from agents (MCP server)
+
+Open Design ships an MCP server (stdio, `daemon-cli.mjs mcp`). Attach it to any
+MCP-capable client with the bundled launcher — it auto-discovers the running
+daemon and the live sidecar endpoint (no hardcoded ports or sockets):
+
+```bash
+install -m755 scripts/open-design-mcp.sh ~/.local/bin/open-design-mcp
+```
+
+Client config (Claude Desktop, Cline, codex, any stdio-MCP client):
+
+```json
+{ "mcpServers": { "open-design": { "command": "/home/USER/.local/bin/open-design-mcp" } } }
+```
+
+Session discovery order: `OD_DAEMON_URL` (explicit) → the running Open Design
+process env whose `OD_DATA_DIR` matches → scan local listeners for the daemon
+that answers `/api/mcp/install-info`. Without the desktop app running, the MCP
+server bootstraps its own headless daemon.
+
+Tools exposed (22): read — `list_projects`, `get_project`, `get_active_context`,
+`get_artifact`, `get_file`, `list_files`, `search_files`; write — `write_file`,
+`create_artifact`, `create_project`, `delete_file`, `delete_project`; runs —
+`start_run`, `get_run`, `cancel_run`, `list_agents`; metadata — `list_skills`,
+`list_plugins`; auth/brief — `start_vela_login`, `get_vela_login_status`,
+`collect_brief`, `confirm_brief`.
+
+Verified on this port: MCP handshake + `tools/list` + a live `list_projects`
+returning real projects. Note upstream's server instructions request the
+product naming "OpenDesign Cloud and Local Codex" in user-facing replies.
+
 ## Caveats (vs upstream mac/win builds)
 
 - Agent CLIs installed via **snap** can break the tools panel's detection: the daemon
