@@ -68,6 +68,10 @@ The AppImage installs nothing; it runs from wherever you place the file and uses
 
 ## Caveats (vs upstream mac/win builds)
 
+- Sign-in hands off back to the app from the browser via `xdg-open opendesign://…`.
+  The deb's desktop entry registers that scheme handler (`MimeType`), so it works out
+  of the box on a fresh install. The AppImage registers nothing itself — run once:
+  `xdg-mime default open-design.desktop x-scheme-handler/opendesign`.
 - Agent-runtime helpers are bundled Linux builds from npm (`@powerformer/vela-cli-linux-x64`
   at the version upstream's pack tool pins). Version drift between the app and the helper
   APIs is possible if upstream changes its pin expecting newer helper capability; report
